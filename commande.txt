@@ -1,0 +1,6 @@
+lien : http://172.17.84.35:5000/offers
+     : http://172.17.84.35:5000/application?applicant=5&appid=5
+
+
+
+
