@@ -1,3 +1,6 @@
+
+# A very simple Flask Hello World app for you to get started with...
+
 from flask import Flask, request, jsonify
 from flaskext.mysql import MySQL
 
@@ -8,14 +11,13 @@ mysql = MySQL()
 app.config['JSON_SORT_KEYS'] = False
 
 # MySQL configurations
-app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = ''
+app.config['MYSQL_DATABASE_USER'] = 'smartrecruit'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'azerty06'
 app.config['MYSQL_CHARSET'] = 'utf-8'
-app.config['MYSQL_DATABASE_DB'] = 'smartrecruit'
-app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+app.config['MYSQL_DATABASE_DB'] = 'smartrecruit$smartrecruit'
+app.config['MYSQL_DATABASE_HOST'] = 'smartrecruit.mysql.pythonanywhere-services.com'
 
 mysql.init_app(app)
-
 
 # Api acces routes
 @app.route('/offers')
@@ -27,12 +29,12 @@ def getOffers():
 	    sql = '''SELECT * FROM offre WHERE id_offre NOT IN (SELECT id_offre FROM candidat_offre WHERE id_candidat=%s) AND id_offre NOT IN (SELECT id_offre FROM favoris WHERE id_candidat=%s)'''
 	    cur.execute(sql, (applicant, applicant))
 	    for row in cur.fetchall():
-	    	jobOffer = {'id': row[0], 
-	    	'position': row[1], 
-	    	'company': row[2], 
-	    	'location': row[3], 
+	    	jobOffer = {'id': row[0],
+	    	'position': row[1],
+	    	'company': row[2],
+	    	'location': row[3],
 	    	'datePosted': row[4],
-	    	'description': row[5], 
+	    	'description': row[5],
 	    	'img': row[6]}
 	    	jobOffers.append(jobOffer)
 	    return jsonify({'response': 'success', 'results-for': 'offers','job-offers':jobOffers})
@@ -46,14 +48,15 @@ def getFavorites():
 	try:
 	    cur = mysql.connect().cursor()
 	    jobOffers = []
-	    cur.execute('''SELECT * FROM offre WHERE id_offre IN (SELECT id_offre FROM favoris)''')
+	    sql = '''SELECT * FROM offre WHERE id_offre IN (SELECT id_offre FROM favoris WHERE id_candidat=%s) AND id_offre NOT IN (SELECT id_offre FROM candidat_offre WHERE id_candidat=%s)'''
+	    cur.execute(sql, (applicant, applicant))
 	    for row in cur.fetchall():
-	    	jobOffer = {'id': row[0], 
-	    	'position': row[1], 
-	    	'company': row[2], 
-	    	'location': row[3], 
-	    	'datePosted': row[4], 
-	    	'description': row[5], 
+	    	jobOffer = {'id': row[0],
+	    	'position': row[1],
+	    	'company': row[2],
+	    	'location': row[3],
+	    	'datePosted': row[4],
+	    	'description': row[5],
 	    	'img': row[6]}
 	    	jobOffers.append(jobOffer)
 	    return jsonify({'response': 'success', 'results-for': 'favorites','job-offers':jobOffers})
@@ -70,13 +73,13 @@ def getOfferCandidat():
 	    cur.execute(sql, (applicant))
 	    candidatApplications = []
 	    for row in cur.fetchall():
-                candidatApplication = {'id': row[0], 
-		'position': row[1], 
-		'company': row[2], 
-		'location': row[3], 
-		'datePosted': row[4], 
-		'description': row[5], 
-		'img': row[6], 
+                candidatApplication = {'id': row[0],
+		'position': row[1],
+		'company': row[2],
+		'location': row[3],
+		'datePosted': row[4],
+		'description': row[5],
+		'img': row[6],
 		'etat': row[7]}
                 candidatApplications.append(candidatApplication)
 	    return jsonify({'response': 'success', 'results-for': 'applications','job-applications':candidatApplications})
@@ -127,17 +130,17 @@ def removeFavorite():
 @app.route('/scheduleAppointment')
 def scheduleAppointment():
 	applicant = request.args.get('applicant')
-	recuter = request.args.get('recruter')
+	recruiter = request.args.get('recruiter')
 	offer = request.args.get('offer')
 	date = request.args.get('date')
-	place = request.args.get('place')
+	time = request.args.get('time')
 	try:
 	    cur = mysql.connect().cursor()
-	    sql = '''INSERT INTO rendez_vous (id_offre, id_candidat, id_recruteur, date_heure, endroit) VALUES(%s, %s, %s, %s, %s)'''
-	    cur.execute(sql, (offer, applicant, recruter, date, place))
+	    sql = '''INSERT INTO rendez_vous (id_offre, id_candidat, id_recruteur, date, time) VALUES(%s, %s, %s, %s, %s)'''
+	    cur.execute(sql, (offer, applicant, recruiter, date, time))
 	    return jsonify({'response':'success'})
 	except Exception as e:
-            return jsonify({'error': 'Exception'})
+            return jsonify({'error': str(e)})
 
 # Get applicants for a recruter
 @app.route('/appointmentRequests')
@@ -149,14 +152,117 @@ def appointmentRequests():
 	    cur.execute(sql, (recruiter))
 	    appointmentReq = []
 	    for row in cur.fetchall():
-	    	req = {'position': row[0], 
-	    	'location': row[1], 
-	    	'applicant': row[2], 
+	    	req = {'position': row[0],
+	    	'location': row[1],
+	    	'applicant': row[2],
 		'offer': row[3]}
 	    	appointmentReq.append(req)
 	    return jsonify({'response': 'success', 'results-for': 'appointments','appointments-requests':appointmentReq})
 	except Exception as e:
             return jsonify({'error': str(e)})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+# Reject application
+@app.route('/rejectApplication')
+def rejectApplication():
+    applicant = request.args.get('applicant')
+    offer = request.args.get('offer')
+    try:
+	    cur = mysql.connect().cursor()
+	    sql = '''UPDATE candidat_offre SET etat='APP_REF' WHERE id_candidat=%s AND id_offre=%s'''
+	    cur.execute(sql, (applicant, offer))
+	    return jsonify({'response':'success'})
+    except Exception as e:
+            return jsonify({'error': 'Exception'})
+
+
+#Get offers recruiter
+@app.route('/offersRecuiter')
+def getOfferseRecruiter():
+	recruiter= request.args.get('recruiter')
+	try:
+	    cur = mysql.connect().cursor()
+	    jobOffersRecruiter=[]
+	    sql = '''SELECT * FROM offre WHERE id_offre IN( SELECT id_offre FROM recruteur_offre WHERE id_recruteur=%s) '''
+	    cur.execute(sql, (recruiter))
+	    for row in cur.fetchall():
+	    	jobOffer = {'id': row[0],
+	    	'position': row[1],
+	    	'company': row[2],
+	    	'location': row[3],
+	    	'datePosted': row[4],
+	    	'description': row[5],
+	    	'img': row[6]}
+	    	jobOffersRecruiter.append(jobOffer)
+	    return jsonify({'response': 'success', 'results-for': 'offersRecuiter','my-offers':jobOffersRecruiter})
+	except Exception as e:
+            return jsonify({'error': str(e)})
+
+#Create offer by recruiter
+@app.route('/addOffreRecuiter')
+def addOffer():
+    recruiter = request.args.get('recruiter')
+    position  =  request.args.get('position')
+    entreprise  =  request.args.get('company')
+    localisation  =  request.args.get('location')
+    datePublication = request.args.get('date')
+    descriptif = request.args.get('desc')
+    offer = request.args.get('offer')
+    try:
+	    cur = mysql.connect().cursor()
+	    sql = '''INSERT INTO `offre`(`id_offre`, `position`, `nom_entreprise`, `localisation`, `date_publication`, `descriptif`) VALUES (%s,%s,%s,%s,%s,%s)'''
+	    cur.execute(sql, (offer, position,entreprise, localisation,datePublication,descriptif))
+	    sql2 = ''' INSERT INTO `recruteur_offre`(`id_recruteur`, `id_offre`) VALUES (%s,%s)'''
+	    cur.execute(sql2, (recruiter, offer))
+	    return jsonify({'response':'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+# Applicant appointments
+@app.route('/applicantAppointments')
+def getApplicantAppointments():
+	applicant = request.args.get('applicant')
+	try:
+	    cur = mysql.connect().cursor()
+	    appointments = []
+	    sql = '''SELECT o.nom_entreprise, o.position, o.localisation, r.date, r.time FROM offre o, rendez_vous r WHERE o.id_offre=r.id_offre and r.id_candidat=%s'''
+	    cur.execute(sql, (applicant))
+	    for row in cur.fetchall():
+	    	rdv = {'company': row[0],
+	    	'position': row[1],
+	    	'location': row[2],
+	    	'day': row[3],
+	    	'hour': row[4]}
+	    	appointments.append(rdv)
+	    return jsonify({'response': 'success', 'results-for': 'appointments','job-appointments':appointments})
+	except Exception as e:
+            return jsonify({'error': str(e)})
+
+# Recruiter appointments
+@app.route('/recruiterAppointments')
+def getRecruiterAppointments():
+	applicant = request.args.get('recruiter')
+	try:
+	    cur = mysql.connect().cursor()
+	    appointments = []
+	    sql = '''SELECT o.position, o.localisation, r.id_candidat, r.date, r.time FROM offre o, rendez_vous r WHERE o.id_offre=r.id_offre and r.id_recruteur=%s'''
+	    cur.execute(sql, (applicant))
+	    for row in cur.fetchall():
+	    	rdv = {'position': row[0],
+	    	'location': row[1],
+	    	'applicant': row[2],
+	    	'day': row[3],
+	    	'hour': row[4]}
+	    	appointments.append(rdv)
+	    return jsonify({'response': 'success', 'results-for': 'appointments','job-appointments':appointments})
+	except Exception as e:
+            return jsonify({'error': str(e)})
+
+
+
+
+
+
+
+
+
+
